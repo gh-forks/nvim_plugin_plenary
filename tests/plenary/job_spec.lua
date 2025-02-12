@@ -10,6 +10,27 @@ local has_all_executables = function(execs)
   return true
 end
 
+local tables_equal = function(t1, t2)
+  if #t1 ~= #t2 then
+    return false
+  end
+  for i, t1_v in ipairs(t1) do
+    if t2[i] ~= t1_v then
+      return false
+    end
+  end
+  return true
+end
+
+local wait_for_result = function(job, result)
+  if type(result) == "string" then
+    result = { result }
+  end
+  vim.wait(1000, function()
+    return tables_equal(job:result(), result)
+  end)
+end
+
 describe("Job", function()
   describe("> cat manually >", function()
     it("should split simple stdin", function()
@@ -25,6 +46,8 @@ describe("Job", function()
       job:start()
       job:send "hello\n"
       job:send "world\n"
+
+      wait_for_result(job, { "hello", "world" })
       job:shutdown()
 
       assert.are.same(job:result(), { "hello", "world" })
@@ -46,6 +69,8 @@ describe("Job", function()
       job:send "\n"
       job:send "world\n"
       job:send "\n"
+
+      wait_for_result(job, { "hello", "", "world", "" })
       job:shutdown()
 
       assert.are.same(job:result(), { "hello", "", "world", "" })
@@ -66,13 +91,15 @@ describe("Job", function()
       job:start()
       job:send "hello\nwor"
       job:send "ld\n"
+
+      wait_for_result(job, { "hello", "world" })
       job:shutdown()
 
       assert.are.same(job:result(), { "hello", "world" })
       assert.are.same(job:result(), results)
     end)
 
-    pending("should split stdin across newlines with no ending newline", function()
+    it("should split stdin across newlines with no ending newline", function()
       local results = {}
       local job = Job:new {
         -- writer = "hello\nword\nthis is\ntj",
@@ -86,6 +113,8 @@ describe("Job", function()
       job:start()
       job:send "hello\nwor"
       job:send "ld"
+
+      wait_for_result(job, { "hello", "world" })
       job:shutdown()
 
       assert.are.same(job:result(), { "hello", "world" })
@@ -110,7 +139,7 @@ describe("Job", function()
       assert.are.same(job:result(), results)
     end)
 
-    pending("should return last line when there is no ending newline", function()
+    it("should return last line when there is no ending newline", function()
       local results = {}
       local job = Job:new {
         command = "printf",
@@ -655,6 +684,7 @@ describe("Job", function()
       input_pipe:write "job.lua\n"
       input_pipe:close()
 
+      wait_for_result(fzf, "job.lua")
       fzf:shutdown()
 
       local results = fzf:result()
@@ -692,6 +722,7 @@ describe("Job", function()
       input_pipe:write "job.lua"
       input_pipe:close()
 
+      wait_for_result(fzf, "job.lua")
       fzf:shutdown()
 
       local results = fzf:result()
